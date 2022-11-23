@@ -28,10 +28,12 @@ class testState(State):
 		self.game = game
 		self.frame = 0
 
-		self.bg_img = pygame.image.load('assets/backgrounds/test_plx/background.png').convert_alpha()
-		self.fg_img = pygame.image.load('assets/backgrounds/test_plx/foreground.png').convert_alpha()
-		self.mg_img = pygame.image.load('assets/backgrounds/test_plx/midground.png').convert_alpha()
-		self.p_img = pygame.image.load('assets/backgrounds/test_plx/platform.png').convert_alpha()
+		self.bg_img = pygame.image.load('assets/backgrounds/test_plx/background_v2.png').convert_alpha()
+		self.fg_img = pygame.image.load('assets/backgrounds/test_plx/foreground_v2.png').convert_alpha()
+		self.mg_img = pygame.image.load('assets/backgrounds/test_plx/midground_v2.png').convert_alpha()
+		self.p_img = pygame.image.load('assets/backgrounds/test_plx/platform_v2.png').convert_alpha()
+		self.bg_color_v2 = (205,104,61)
+		self.bg_color_v1 = (169,178,162)
 
 		self.temp_boss = pygame.image.load('assets/temp_boss.png').convert_alpha()
 		self.parallax_speed = 3
@@ -48,12 +50,11 @@ class testState(State):
 
 	def render(self, surface):
 		p_val_x = (4 + self.game.player.quadrant_x) * self.parallax_speed
-		#p_val_y = self.game.player.quadrant_y * self.parallax_speed
-		surface.fill((213,60,106))
-		surface.blit(self.bg_img, (0,0), (0+p_val_x, 20, self.game.WIDTH, self.game.HEIGHT))
-		surface.blit(self.mg_img, (0,0), (p_val_x*2, 80, self.game.WIDTH, self.game.HEIGHT))
-
-		surface.blit(self.fg_img, (0,0), (p_val_x*3, 160, self.game.WIDTH, self.game.HEIGHT))
+		p_val_y = self.game.player.quadrant_y * self.parallax_speed
+		surface.fill(self.bg_color_v2)
+		surface.blit(self.bg_img, (0,0), (0+p_val_x, 10 - p_val_y, self.game.WIDTH, self.game.HEIGHT))
+		surface.blit(self.mg_img, (0,0), (p_val_x*2, 80 - p_val_y*2, self.game.WIDTH, self.game.HEIGHT))
+		surface.blit(self.fg_img, (0,0), (p_val_x*3, 160 - p_val_y*3, self.game.WIDTH, self.game.HEIGHT))
 		surface.blit(self.temp_boss, (self.game.player.quadrant_x * 4, 0))
 		surface.blit(self.p_img, (0,0))
 
@@ -68,4 +69,10 @@ class testState(State):
 surface.blit(self.bg_img, (0,0), (0+p_val_x, 10 - p_val_y, self.game.WIDTH, self.game.HEIGHT))
 surface.blit(self.mg_img, (0,0), (p_val_x*2, 80 - p_val_y*2, self.game.WIDTH, self.game.HEIGHT))
 surface.blit(self.fg_img, (0,0), (p_val_x*3, 160 - p_val_y*3, self.game.WIDTH, self.game.HEIGHT))
+"""
+
+""" NON -UPDOWN
+surface.blit(self.bg_img, (0,0), (0+p_val_x, 20, self.game.WIDTH, self.game.HEIGHT))
+surface.blit(self.mg_img, (0,0), (p_val_x*2, 80, self.game.WIDTH, self.game.HEIGHT))
+surface.blit(self.fg_img, (0,0), (p_val_x*3, 160, self.game.WIDTH, self.game.HEIGHT))
 """

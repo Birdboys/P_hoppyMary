@@ -6,7 +6,7 @@ class Player:
 
 	def __init__(self, gwidth, gheight):
 		self.game_width, self.game_height = gwidth, gheight
-		self.width, self.height = 48,48
+		self.width, self.height = 32,32
 		self.pos = [60, 630]
 		self.surf = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
 		self.rect = pygame.Rect(self.pos[0]-self.width/2, self.pos[1]-self.height, self.width, self.height)
@@ -34,9 +34,9 @@ class Player:
 		self.air2_fast_fall = False
 		self.air2_original_height = 0
 		self.air2_ascend_speed = 5
-		self.air2_slow_fall_speed = 3 
+		self.air2_slow_fall_speed = 2 
 		self.air2_descend_speed = 0
-		self.air2_dest_fall_speed = 15
+		self.air2_fast_fall_speed = 20
 		self.air2_gravity = 0.5
 		self.air2_terminal = 20
 
@@ -47,7 +47,11 @@ class Player:
 		self.walk_right_sheet = pygame.transform.scale(self.walk_right_sheet, (self.width * (self.walk_right_sheet.get_width()/32), self.height))
 		self.walk_left_sheet = pygame.image.load('assets/player/player_walk_left_sheet.png').convert_alpha()
 		self.walk_left_sheet = pygame.transform.scale(self.walk_left_sheet, (self.width * (self.walk_left_sheet.get_width()/32), self.height))
-
+		self.air1_sheet = pygame.image.load('assets/player/player_jump1_sheet.png')
+		self.air1_sheet = pygame.transform.scale(self.air1_sheet, (self.width * (self.air1_sheet.get_width()/32), self.height))
+		self.air2_sheet = pygame.image.load	('assets/player/player_jump2_sheet.png')
+		self.air2_sheet = pygame.transform.scale(self.air2_sheet, (self.width * (self.air2_sheet.get_width()/32), self.height))
+		self.air2_halo = pygame.image.load('assets/player/player_halo.png').convert_alpha()
 		self.frame = 0
 		self.walk_animation_speed = 5
 
@@ -112,15 +116,21 @@ class Player:
 				self.air1_descend_speed = 0 #reset air descent speed
 
 		if self.state == 2: #AIR_2
-			
-			if not self.air2_apex and not (self.air2_original_height - self.pos[1]) > 100:
+			if not self.air2_apex and not (self.air2_original_height - self.pos[1]) > 100: #if they haven't already jumpted
 				self.pos[1] = self.pos[1] + (self.air2_ascend_speed * delta * 60 * -1) #ascend
 				if (self.air2_original_height - self.pos[1]) > 100: #if we finished jump
 					self.air2_apex = True #set jump flag
 
-			else:
-				if not self.air2_fast_fall:
-					if keys[pygame.K_SPACE]: #if they are pressing
+			else: #if we have jumped
+				if not self.air2_fast_fall: #if they aren't fast falling
+					if keys[pygame.K_SPACE]: #if they are pressing button
+						if self.button_state == False: #if it was an original press
+							self.button_state = True #set button state to true
+							if self.didJump(pygame.time.get_ticks(), 200): #if they activated fastfall
+								self.air2_fast_fall = True #turn on fastfall flag
+							else:
+								self.button_timer = pygame.time.get_ticks()
+
 						self.button_state = True
 						self.air2_descend_speed = self.air2_descend_speed - 1 #slow descent with wings
 						if self.air2_descend_speed < self.air2_slow_fall_speed:
@@ -135,7 +145,7 @@ class Player:
 						self.button_state = False
 						self.pos[1] = self.pos[1] + (self.air2_descend_speed * delta * 60) #normal fall
 
-				else:
+				else: 
 					self.pos[1] = self.pos[1] + (self.air2_fast_fall_speed * delta * 60) #fast fall
 
 			if self.groundCheck(): #if we are now grounded
@@ -151,6 +161,7 @@ class Player:
 
 	def render(self, surface):
 		self.surf.fill((0,0,0,0))
+
 		if self.state == 0:
 			if self.idle_state:
 				surface.blit(self.idle_image, self.rect)
@@ -160,8 +171,44 @@ class Player:
 				else:
 					self.getFrame(self.walk_right_sheet, self.walk_animation_speed, self.frame)
 				surface.blit(self.surf, self.rect)
+		
+		elif self.state == 1:
+			if not self.air1_apex:
+				if self.pos[1] < 330:
+					index = 1
+				else:
+					index = 0
+			elif self.air1_descend_speed < 5:
+				index = 1
+			else:
+				index = 2
+			self.surf.blit(self.air1_sheet, (0,0), (index * self.width, 0, (index+1) * self.width, self.height))
+			surface.blit(self.surf, self.rect)
+
+		elif self.state == 2:
+			halo = False
+			if not self.air2_apex:
+				halo = True
+				index = 0
+			elif self.air2_fast_fall:
+				index = 3
+			elif self.button_state:
+				halo = True
+				index = 0
+			elif self.air2_descend_speed > 5:
+				index = 2
+			else:
+				index = 1
+			self.surf.blit(self.air2_sheet, (0,0), (index * self.width, 0, (index+1) * self.width, self.height))
+			surface.blit(self.surf, self.rect)
+			if halo:
+				surface.blit(self.air2_halo, ((self.rect.x-8, self.rect.y-8)))
+			
+
 		else:
 			pygame.draw.rect(surface, (30,255,150), self.rect)
+
+		
 
 	def updateRect(self):
 		self.rect.x = self.pos[0]-self.width/2
@@ -205,8 +252,6 @@ class Player:
 		num_frames = sheet.get_width()/self.width
 		index = frame % (num_frames * speed) // num_frames
 		self.surf.blit(sheet, (0,0), (index * self.width, 0, (index+1) * self.width, self.height))
-
-		print(index)
 
 		
 
