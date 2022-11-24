@@ -16,14 +16,14 @@ class Game:
 	def __init__(self):
 		pygame.init()
 		pygame.mixer.init()
-		pygame.mixer.music.set_volume(0.3)
+		pygame.mixer.music.set_volume(0.0)
 		self.WIDTH, self.HEIGHT = 360, 640
 		self.WIN = pygame.display.set_mode((self.WIDTH,self.HEIGHT))
 		self.game_canvas = pygame.Surface((self.WIDTH, self.HEIGHT), pygame.SRCALPHA)
 
 		self.playing = True
 		self.running = True
-		self.state_stack = [testState(self)]
+		self.state_stack = [fightState(self)]
 		self.prev_state = None
 
 		self.player = Player(360, 640)

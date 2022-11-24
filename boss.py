@@ -16,31 +16,44 @@ class Boss():
 		self.og_widthts = {'top':[self.top.width, self.top.height], 'mid':[self.mid.width, self.mid.height], 'bot':[self.bot.width, self.bot.height]}
 		self.og_pos = {'top':self.top.pos, 'mid':self.mid.pos, 'bot':self.bot.pos}
 		
-		self.attack_stack = [('bot',1)]
+		self.attacks = [('top',1), ('mid',2), ('bot',1)]
+		self.atk_probs = [0, 5, 0]
+		self.attack_stack = [('bot',2)]
 		self.state = 0 #0-IDLE, 1-ATTACKING_1, 2-ATTACKING_2
 		self.frame = 0
 
 	def update(self, events, delta, keys, player_pos):
 		obstacles = []
 		self.frame = self.frame + 1
-		for key in self.body_parts:
-			if self.body_parts[key].state == 2:
-				self.body_parts[key].attack_init(1, player_pos)
-			elif self.body_parts[key].state == 3:
-				self.body_parts[key].attack_update(1, player_pos)
-				for ob in self.body_parts[key].getObstacles():
-					obstacles.append(ob)
-			elif self.body_parts[key].state == 4:
-				self.body_parts[key].reset()
-			self.body_parts[key].update(delta, keys)
 
-		if keys[pygame.K_SPACE] and self.top.state == 0:
-			pass
-			#self.top.state = 1
-		if keys[pygame.K_UP] and self.mid.state == 0:
-			self.mid.state = 1
-		if keys[pygame.K_DOWN] and self.bot.state == 0:
-			self.bot.state = 1
+		idle = True
+		for part in self.body_parts:
+			if self.body_parts[part].state != 0:
+				idle = False
+
+		if idle:
+			if len(self.attack_stack) == 0:
+				self.attack_stack.append(random.choices(self.attacks, weights=self.atk_probs)[0])
+				self.attack_stack.append(random.choices(self.attacks, weights=self.atk_probs)[0])
+			else:
+				self.current_attack = self.attack_stack.pop()
+				self.body_parts[self.current_attack[0]].state = 1
+				self.body_parts[self.current_attack[0]].current_attack = self.current_attack[1]
+
+		else:
+
+			for key in self.body_parts:
+				if self.body_parts[key].state == 2 and key == self.current_attack[0]:
+					self.body_parts[key].attack_init(self.current_attack[1], player_pos)
+				elif self.body_parts[key].state == 3 and key == self.current_attack[0]:
+					self.body_parts[key].attack_update(self.current_attack[1], player_pos)
+					for ob in self.body_parts[key].getObstacles():
+						obstacles.append(ob)
+				elif self.body_parts[key].state == 4 and key == self.current_attack[0]:
+					self.body_parts[key].reset()
+					self.current_attack = None
+
+				self.body_parts[key].update(delta, keys)
 
 		return obstacles
 
@@ -99,27 +112,18 @@ class bossPiece():
 			self.getFrame(self.idle_sheet, 20, self.frame)
 			surface.blit(self.surf, (self.rect.x + offset[0], self.rect.y + offset[1]))
 		elif self.state == 1:
-			self.getFrame(self.idle_sheet, 20, self.frame)
-			if self.retreat_val < 254:
-				self.retreat_val = self.retreat_val + 3
-				scale_val = 1- (0.25 * self.retreat_val/255)
-				temp = pygame.transform.scale(self.surf, (self.width * scale_val, self.height * scale_val))
-				temp_rect = pygame.Rect(self.pos[0]-(self.width * scale_val)/2, self.pos[1]-(self.height * scale_val)/2, self.width * scale_val, self.height * scale_val)
-				surface.blit(temp, temp_rect)
-				pygame.draw.rect(surface,(35,24,36,self.retreat_val*.3), temp_rect)
-			else:
-				temp_rect = pygame.Rect(self.pos[0]-(self.width * 0.75)/2, self.pos[1]-(self.height * 0.75)/2, self.width * 0.75, self.height * 0.75)
-				self.pos[1] = self.pos[1] + 20
-				pygame.draw.rect(surface,(35,24,36), temp_rect)
-				if self.pos[1] > 640:
-					self.state = 2
-					self.retreat_val = 0
+			self.attack_render_intro(surface)
+		elif self.state == 2:
+			pass
 		elif self.state == 3:
 			self.attack_render(surface)
 
 
 	def attack_init(self, attack, player_pos):
 		self.state = 3
+		pass
+
+	def attack_render_intro(self, surface):
 		pass
 
 	def attack_update(self, delta, keys):
@@ -172,6 +176,13 @@ class bossMid(bossPiece):
 		self.idle_sheet = pygame.transform.scale(self.idle_sheet, (self.width * (self.idle_sheet.get_width()/160), self.height))
 		self.pos = [180, 420]
 
+		self.attack1surf = pygame.Surface((self.width*1.25, self.height*1.25))
+		self.attack1rect = pygame.Rect((0,0),(self.width*1.25, self.height*1.25))
+		self.attack1rect_speed = 2
+
+		self.attack2rects = []
+		self.attack2rect_speed = 5
+
 	def reset(self):
 		self.pos = [180, 420]
 		self.frame = 0
@@ -182,6 +193,100 @@ class bossMid(bossPiece):
 		self.scalable_surf = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
 		self.rect = pygame.Rect(self.pos[0]-self.width/2, self.pos[1]-self.height, self.width, self.height)
 		self.retreat_val = 0
+	
+	def attack_init(self, attack, player_pos):
+		if attack == 1:
+			self.attack1rect.x = player_pos[0] + random.randint(-20,20)
+			self.attack1rect.y = 0 - self.attack1rect.height
+			
+			if self.attack1rect.x < 0:
+				self.attack1rect.x = 0
+			elif self.attack1rect.x > 360 - self.attack1rect.width:
+				self.attack1rect.x = 360-self.attack1rect.width
+
+			self.state = 3
+			self.current_attack = 1
+
+		if attack == 2:
+
+			self.attack2rects = [pygame.Rect(random.randint(0, 330), 0-self.height*1.25, self.width/6, self.height*1.25) for x in range(6)]
+			self.attack2rects[0].x = player_pos[0] + random.randint(-20,20)
+			if self.attack2rects[0].x < 0:
+				self.attack2rects[0].x = 0
+			if self.attack2rects[0].x + self.attack2rects[0].width > 360:
+				self.attack2rects[0].x = 360 - self.attack2rects[0].width
+
+			self.state = 3
+			self.current_attack = 2
+
+
+	def attack_render_intro(self, surface):
+		if self.current_attack == 1:
+			self.getFrame(self.idle_sheet, 20, self.frame)
+			if self.retreat_val < 254:
+				self.retreat_val = self.retreat_val + 3
+				scale_val = 1- (0.25 * self.retreat_val/255)
+				temp = pygame.transform.scale(self.surf, (self.width * scale_val, self.height * scale_val))
+				temp_rect = pygame.Rect(self.pos[0]-(self.width * scale_val)/2, self.pos[1]-(self.height * scale_val)/2, self.width * scale_val, self.height * scale_val)
+				surface.blit(temp, temp_rect)
+				pygame.draw.rect(surface,(35,24,36,self.retreat_val*.3), temp_rect)
+			else:
+				temp_rect = pygame.Rect(self.pos[0]-(self.width * 0.75)/2, self.pos[1]-(self.height * 0.75)/2, self.width * 0.75, self.height * 0.75)
+				self.pos[1] = self.pos[1] + 20
+				pygame.draw.rect(surface,(35,24,36), temp_rect)
+				if self.pos[1] > 640:
+					self.state = 2
+					self.retreat_val = 0
+
+		elif self.current_attack == 2:
+				self.getFrame(self.idle_sheet, 20, self.frame)
+				if self.retreat_val < 254:
+					self.retreat_val = self.retreat_val + 3
+					scale_val = 1- (0.25 * self.retreat_val/255)
+					temp = pygame.transform.scale(self.surf, (self.width * scale_val, self.height * scale_val))
+					temp_rect = pygame.Rect(self.pos[0]-(self.width * scale_val)/2, self.pos[1]-(self.height * scale_val)/2, self.width * scale_val, self.height * scale_val)
+					surface.blit(temp, temp_rect)
+					pygame.draw.rect(surface,(35,24,36,self.retreat_val*.3), temp_rect)
+				else:
+					temp_rect = pygame.Rect(self.pos[0]-(self.width * 0.75)/2, self.pos[1]-(self.height * 0.75)/2, self.width * 0.75, self.height * 0.75)
+					temp_rects = [pygame.Rect((temp_rect.x + temp_rect.width * 1/6*p + 6, temp_rect.y), (temp_rect.width * 1/6 - 6, temp_rect.height)) for p in range(6)]
+					pos_old = self.pos[1]
+					self.pos[1] = self.pos[1] + 10
+					for r in range(len(temp_rects)):
+						pygame.draw.rect(surface, (35,24,36), temp_rects[r])
+					if temp_rects[0].y + temp_rects[0].height > 640:
+						self.state = 2
+						self.retreat_val = 0
+
+
+	def attack_update(self, delta, keys):
+		if self.current_attack == 1:
+			self.attack1rect.y = self.attack1rect.y + self.attack1rect_speed
+			if self.attack1rect.y + self.attack1rect.height > 635:
+				self.state = 4
+
+		if self.current_attack == 2:
+
+			self.attack2rects[0].y = self.attack2rects[0].y + self.attack2rect_speed
+			if self.attack2rects[0].y + self.attack2rects[0].height > 640:
+				self.attack2rects.pop(0)
+			
+			if len(self.attack2rects) == 0:
+				self.state = 4
+
+	def attack_render(self, surface):
+		if self.current_attack == 1:
+			pygame.draw.rect(surface, (35,24,36), self.attack1rect)
+
+	def getObstacles(self):
+		if self.current_attack == 1:
+			return [Obstacle(self.attack1surf, self.attack1rect)]
+		if self.current_attack == 2:
+			ret = []
+			for rect in self.attack2rects:
+				if rect.y > 0:
+					ret.append(Obstacle(pygame.Surface((rect.width, rect.height)), rect))
+			return ret
 
 class bossBot(bossPiece):
 
@@ -194,8 +299,11 @@ class bossBot(bossPiece):
 
 		self.attack1surf = pygame.Surface((self.width*1.5, self.height*1.5))
 		self.attack1rect = pygame.Rect((0,0),(self.width*1.5, self.height*1.5))
-		self.attack1rect_speed = 5
-		
+		self.attack1rect_speed = 3
+
+		self.attack23rect_l = None
+		self.attack23rect_r = None
+		self.attack23rect_speed = 5
 	
 	def reset(self):
 		self.pos = [180, 520]
@@ -212,14 +320,80 @@ class bossBot(bossPiece):
 		if attack == 1:
 			self.attack1rect.x = player_pos[0] + random.randint(-20,20)
 			self.attack1rect.y = 0 - self.attack1rect.height
+			
+			if self.attack1rect.x < 0:
+				self.attack1rect.x = 0
+			elif self.attack1rect.x > 360 - self.attack1rect.width:
+				self.attack1rect.x = 360-self.attack1rect.width
+			
 			self.state = 3
 			self.current_attack = 1
+
+		elif attack == 2:
+			w, h = self.width/2, self.height/2
+			self.attack23rect_l = pygame.Rect(0 - w, 640 - h, w, h)
+			self.attack23rect_r = pygame.Rect(360, 640 - 2 * h, w, h)
+
+		elif attack == 3:
+			w, h = self.width/2, self.height/2
+			self.attack23rect_l = pygame.Rect(0 - w, 640 - 2 *h, w, h)
+			self.attack23rect_r = pygame.Rect(360, 640 - h, w, h)
+
+	def attack_render_intro(self, surface):
+		if self.current_attack == 1:
+			self.getFrame(self.idle_sheet, 20, self.frame)
+			if self.retreat_val < 254:
+				self.retreat_val = self.retreat_val + 3
+				scale_val = 1- (0.25 * self.retreat_val/255)
+				temp = pygame.transform.scale(self.surf, (self.width * scale_val, self.height * scale_val))
+				temp_rect = pygame.Rect(self.pos[0]-(self.width * scale_val)/2, self.pos[1]-(self.height * scale_val)/2, self.width * scale_val, self.height * scale_val)
+				surface.blit(temp, temp_rect)
+				pygame.draw.rect(surface,(35,24,36,self.retreat_val*.3), temp_rect)
+			else:
+				temp_rect = pygame.Rect(self.pos[0]-(self.width * 0.75)/2, self.pos[1]-(self.height * 0.75)/2, self.width * 0.75, self.height * 0.75)
+				self.pos[1] = self.pos[1] + 20
+				pygame.draw.rect(surface,(35,24,36), temp_rect)
+				if self.pos[1] > 640:
+					self.state = 2
+					self.retreat_val = 0
+
+		if self.current_attack == 2:
+			self.getFrame(self.idle_sheet, 20, self.frame)
+			if self.retreat_val < 254:
+				self.retreat_val = self.retreat_val + 3
+				scale_val = 1- (0.25 * self.retreat_val/255)
+				temp = pygame.transform.scale(self.surf, (self.width * scale_val, self.height * scale_val))
+				temp_rect = pygame.Rect(self.pos[0]-(self.width * scale_val)/2, self.pos[1]-(self.height * scale_val)/2, self.width * scale_val, self.height * scale_val)
+				surface.blit(temp, temp_rect)
+				pygame.draw.rect(surface,(35,24,36,self.retreat_val*.3), temp_rect)
+			else:
+				temp_rect = pygame.Rect(self.pos[0]-(self.width * 0.75)/2, self.pos[1]-(self.height * 0.75)/2, self.width * 0.75, self.height * 0.75)
+				temp_rect_top = pygame.Rect(temp_rect.x, temp_rect.y, self.width * 0.75, self.height *0.75 * 0.5)
+				temp_rect_bot = pygame.Rect(360 - temp_rect.x - temp_rect_top.width, temp_rect.y+(self.height)/2+ 2, self.width * 0.75, self.height * 0.75 * 0.5 - 1)
+				pygame.draw.rect(surface, (35,24,36), temp_rect_top)
+				pygame.draw.rect(surface, (35,24,36), temp_rect_bot)
+				old_pos = self.pos[0]
+				self.pos[0] = self.pos[0] + 10
+				if self.pos[0] + self.width < 0:
+					self.state = 2
+					self.retreat_val = 0
+
+		else:
+			print("FUCK")
 
 	def attack_update(self, delta, keys):
 		if self.current_attack == 1:
 			self.attack1rect.y = self.attack1rect.y + self.attack1rect_speed
-			if self.attack1rect.y > 640:
+			if self.attack1rect.y + self.attack1rect.height > 635:
 				self.state = 4
+
+		if self.current_attack == 2 or self.current_attack == 3:
+			self.attack23rect_l.x = self.attack23rect_l.x + self.attack23rect_speed
+			self.attack23rect_r.x = self.attack23rect_r.x - self.attack23rect_speed
+
+			if self.attack23rect_r.x < 0 or self.attack23rect_l + self.attack23rect_l.width > 360:
+				self.state =4
+			
 
 	def attack_render(self, surface):
 		if self.current_attack == 1:
@@ -228,6 +402,9 @@ class bossBot(bossPiece):
 	def getObstacles(self):
 		if self.current_attack == 1:
 			return [Obstacle(self.attack1surf, self.attack1rect)]
+
+		if self.current_attack == 2 or self.current_attack == 3:
+			
 
 class bossHead(bossPiece):
 	
@@ -268,6 +445,22 @@ class Obstacle():
 	def __init__(self, surface, rect):
 		self.surf = surface
 		self.rect = rect
+		self.shadow_smallest_size = 0.5
 
 	def render(self, surface):
 		surface.blit(self.surf, self.rect)
+
+	def renderShadow(self, surface):
+		shadow_rect = self.getShadow()
+		pygame.draw.ellipse(surface, (0,0,0), shadow_rect)
+
+	def getShadow(self):
+		s_width = self.rect.width - self.rect.width * (((1-self.shadow_smallest_size) * (626 - (self.rect.y + self.rect.height))/626))
+		return pygame.Rect(self.rect.x + (self.rect.width - s_width)/2, 626, s_width, 13)
+
+
+#TOMORROW PLAN
+#GENERALIZE BLOCK LEAVING TO FUNCTION LIKE ATTACK_UPDATE
+#USE PLAYER QUADRANTS TO WEIGHT ATTACKS OR WEIGHT ATTACK LOCATIONS
+#MENUS
+#SOUND EFFF

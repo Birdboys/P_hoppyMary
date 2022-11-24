@@ -22,6 +22,8 @@ class Player:
 		self.quadrant_x = 0
 		self.quadrant_y = 0
 
+		self.dead = False
+
 		#air1 stuff
 		self.air1_apex = False
 		self.air1_ascend_speed = 12
@@ -55,7 +57,7 @@ class Player:
 		self.frame = 0
 		self.walk_animation_speed = 5
 
-	def update(self, delta, keys):
+	def update(self, delta, keys, obstacles):
 		
 		if self.state == 0: #GROUNDED
 			if keys[pygame.K_SPACE]: #if they are pressing space
@@ -159,6 +161,10 @@ class Player:
 		self.updateRect() #update rect after moving and stuff
 		self.getQuad()		
 
+		for obstacle in obstacles:
+			if self.rect.colliderect(obstacle.rect):
+				self.dead = True
+
 	def render(self, surface):
 		self.surf.fill((0,0,0,0))
 
@@ -203,12 +209,9 @@ class Player:
 			surface.blit(self.surf, self.rect)
 			if halo:
 				surface.blit(self.air2_halo, ((self.rect.x-8, self.rect.y-8)))
-			
-
+		
 		else:
 			pygame.draw.rect(surface, (30,255,150), self.rect)
-
-		
 
 	def updateRect(self):
 		self.rect.x = self.pos[0]-self.width/2
