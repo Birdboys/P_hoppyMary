@@ -23,11 +23,11 @@ class Game:
 
 		self.playing = True
 		self.running = True
-		self.state_stack = [fightState(self)]
+		self.state_stack = [homeState(self)]
 		self.prev_state = None
 
 		self.player = Player(360, 640)
-		self.boss = Boss(360, 640)
+		self.boss = Boss(360, 640, pygame.time.get_ticks())
 
 		self.tracks = {'fight':'assets/music/fight_track.mp3'}
 		pygame.mixer.music.load(self.tracks['fight'])

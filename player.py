@@ -11,7 +11,7 @@ class Player:
 		self.surf = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
 		self.rect = pygame.Rect(self.pos[0]-self.width/2, self.pos[1]-self.height, self.width, self.height)
 
-		self.run_speed = 2.3
+		self.run_speed = 2.5
 		self.state = 0 #0=GROUNDED, 1=AIR_1, 2=AIR_2
 		self.button_state = False
 		self.button_timer = 0
@@ -162,7 +162,7 @@ class Player:
 		self.getQuad()		
 
 		for obstacle in obstacles:
-			if self.rect.colliderect(obstacle.rect):
+			if self.rect.colliderect(obstacle.rect) and not obstacle.shadow_smallest_size == -1:
 				self.dead = True
 
 	def render(self, surface):
@@ -255,6 +255,11 @@ class Player:
 		num_frames = sheet.get_width()/self.width
 		index = frame % (num_frames * speed) // num_frames
 		self.surf.blit(sheet, (0,0), (index * self.width, 0, (index+1) * self.width, self.height))
+
+	def introUpdate(self):
+		self.pos[0] = self.pos[0] + self.run_speed
+		self.frame = self.frame + 1
+		self.updateRect()
 
 		
 
