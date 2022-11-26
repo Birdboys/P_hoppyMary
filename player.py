@@ -2,7 +2,17 @@ import pygame
 import numpy as np
 import os
 import random 
+from particle import * 
 class Player:
+
+	jump_sound = pygame.mixer.Sound('assets/sounds/jump.wav')
+	jump_sound.set_volume(0.1)
+
+	wing_flap = pygame.mixer.Sound('assets/sounds/wing_flap.wav')
+	wing_flap.set_volume(0.1)
+
+	land_sound =pygame.mixer.Sound('assets/sounds/land_sound.wav')
+	land_sound.set_volume(0.1)
 
 	def __init__(self, gwidth, gheight):
 		self.game_width, self.game_height = gwidth, gheight
@@ -10,6 +20,7 @@ class Player:
 		self.pos = [60, 630]
 		self.surf = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
 		self.rect = pygame.Rect(self.pos[0]-self.width/2, self.pos[1]-self.height, self.width, self.height)
+		self.rect_hit = pygame.Rect(self.pos[0]-(self.width*0.8)/2, self.pos[1]-self.height, self.width*0.8, self.height)
 
 		self.run_speed = 2.5
 		self.state = 0 #0=GROUNDED, 1=AIR_1, 2=AIR_2
@@ -59,6 +70,7 @@ class Player:
 
 	def update(self, delta, keys, obstacles):
 		
+		p = []
 		if self.state == 0: #GROUNDED
 			if keys[pygame.K_SPACE]: #if they are pressing space
 				backwards = 1 #walk back
@@ -71,6 +83,7 @@ class Player:
 					if self.didJump(pygame.time.get_ticks(), 200): #if they jumped
 						self.state = 1 #change to jump state
 						self.idle_state = False
+						Player.jump_sound.play()
 
 					else: #if they didn't
 						self.button_timer = pygame.time.get_ticks() #set timer at press time
@@ -107,6 +120,8 @@ class Player:
 				self.pos[1] = self.pos[1] + (self.air1_descend_speed * delta * 60) #they fall
 				
 				if keys[pygame.K_SPACE]: #if button pressed
+					Player.jump_sound.play()
+					Player.wing_flap.play()
 					self.state = 2 
 					self.air1_apex = False
 					self.air1_descend_speed = 0
@@ -114,6 +129,8 @@ class Player:
 					self.air2_original_height = self.pos[1]
 
 			if self.groundCheck(): #if we are now grounded
+				Player.land_sound.play()
+				p = [Particle('circle', self.pos[0] + random.randint(-5,5), self.pos[1], 4 + random.randint(-2,2), 4 + random.randint(-2,2), random.randint(-3, 3), random.randint(-10,-5), 0, 0.3, (28,20,29), 0.05) for x in range(20)]
 				self.air1_apex = False #reset air1 stuff
 				self.air1_descend_speed = 0 #reset air descent speed
 
@@ -122,6 +139,7 @@ class Player:
 				self.pos[1] = self.pos[1] + (self.air2_ascend_speed * delta * 60 * -1) #ascend
 				if (self.air2_original_height - self.pos[1]) > 100: #if we finished jump
 					self.air2_apex = True #set jump flag
+
 
 			else: #if we have jumped
 				if not self.air2_fast_fall: #if they aren't fast falling
@@ -151,6 +169,11 @@ class Player:
 					self.pos[1] = self.pos[1] + (self.air2_fast_fall_speed * delta * 60) #fast fall
 
 			if self.groundCheck(): #if we are now grounded
+				Player.land_sound.play()
+				if self.air2_fast_fall:
+					p = [Particle('circle', self.pos[0] + random.randint(-5,5), self.pos[1], 8 + random.randint(-2,2), 8 + random.randint(-2,2), random.randint(-3, 3), random.randint(-10,-5), 0, 0.3, (28,20,29), 0.05) for x in range(20)]
+				else:
+					p = [Particle('circle', self.pos[0] + random.randint(-5,5), self.pos[1], 4 + random.randint(-2,2), 4 + random.randint(-2,2), random.randint(-3, 3), random.randint(-10,-5), 0, 0.3, (28,20,29), 0.05) for x in range(20)]
 				self.air2_apex = False
 				self.air2_fast_fall = False #reset air2 stuff
 				self.air2_original_height = 0
@@ -162,8 +185,10 @@ class Player:
 		self.getQuad()		
 
 		for obstacle in obstacles:
-			if self.rect.colliderect(obstacle.rect) and not obstacle.shadow_smallest_size == -1:
+			if self.rect_hit.colliderect(obstacle.rect) and not obstacle.shadow_smallest_size == -1:
 				self.dead = True
+
+		return p
 
 	def render(self, surface):
 		self.surf.fill((0,0,0,0))
@@ -216,6 +241,8 @@ class Player:
 	def updateRect(self):
 		self.rect.x = self.pos[0]-self.width/2
 		self.rect.y = self.pos[1]-self.height
+		self.rect_hit.x = self.pos[0]-(self.width*0.8)/2
+		self.rect_hit.y = self.pos[1]-self.height
 
 	def edgeCheck(self):
 		if (self.pos[0] - self.width/2) < 0:
@@ -260,6 +287,40 @@ class Player:
 		self.pos[0] = self.pos[0] + self.run_speed
 		self.frame = self.frame + 1
 		self.updateRect()
+
+	def reset(self):
+		self.pos = [60, 630]
+		self.run_speed = 2.5
+		self.state = 0 #0=GROUNDED, 1=AIR_1, 2=AIR_2
+		self.button_state = False
+		self.button_timer = 0
+
+		self.idle_state = False
+		self.idle_timer = 0
+
+		self.quadrant_x = 0
+		self.quadrant_y = 0
+
+		self.dead = False
+
+		#air1 stuff
+		self.air1_apex = False
+		self.air1_ascend_speed = 12
+		self.air1_descend_speed = 0
+		self.air1_gravity = 0.5
+		self.air1_terminal = 20
+
+		#air2 stuff
+		self.air2_apex = False
+		self.air2_fast_fall = False
+		self.air2_original_height = 0
+		self.air2_ascend_speed = 5
+		self.air2_slow_fall_speed = 2 
+		self.air2_descend_speed = 0
+		self.air2_fast_fall_speed = 20
+		self.air2_gravity = 0.5
+		self.air2_terminal = 20
+		self.frame = 0
 
 		
 

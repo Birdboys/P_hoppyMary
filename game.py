@@ -16,21 +16,21 @@ class Game:
 	def __init__(self):
 		pygame.init()
 		pygame.mixer.init()
-		pygame.mixer.music.set_volume(0.0)
+		pygame.mixer.music.set_volume(0.3)
 		self.WIDTH, self.HEIGHT = 360, 640
 		self.WIN = pygame.display.set_mode((self.WIDTH,self.HEIGHT))
 		self.game_canvas = pygame.Surface((self.WIDTH, self.HEIGHT), pygame.SRCALPHA)
 
 		self.playing = True
 		self.running = True
-		self.state_stack = [homeState(self)]
+		self.state_stack = [titleState(self)]
 		self.prev_state = None
 
 		self.player = Player(360, 640)
 		self.boss = Boss(360, 640, pygame.time.get_ticks())
 
-		self.tracks = {'fight':'assets/music/fight_track.mp3'}
-		pygame.mixer.music.load(self.tracks['fight'])
+		self.tracks = {'fight':'assets/music/fight_track.mp3', 'menu':'assets/music/menu_track.mp3'}
+		pygame.mixer.music.load(self.tracks['menu'])
 		pygame.mixer.music.play(-1)
 
 	def update(self, events, delta, keys):
@@ -44,6 +44,11 @@ class Game:
 	def game_loop(self):
 		delta = Game.clock.tick(Game.FPS)/1000
 		events = pygame.event.get()
+		for event in events:
+			if event.type == pygame.QUIT:
+				self.playing = False
+				self.running = False
+
 		keys = pygame.key.get_pressed()
 		self.update(events, delta, keys)
 		self.render(self.WIN)

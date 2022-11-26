@@ -6,6 +6,8 @@ import math
 from particle import *
 
 class Boss():
+	boss_laugh = pygame.mixer.Sound('assets/sounds/boss_laugh.wav')
+	boss_laugh.set_volume(0.1)
 	def __init__(self, gwidth, gheight, init_time):
 		self.head = bossHead()
 		self.pupil = bossPupil()
@@ -27,9 +29,13 @@ class Boss():
 		self.state = 0 #0-IDLE, 1-ATTACKING_1, 2-ATTACKING_2
 		self.frame = 0
 		self.init_time = init_time
+		self.has_laughed = False
 
 
 	def update(self, events, delta, keys, player_pos):
+		if not self.has_laughed:
+			Boss.boss_laugh.play()
+			self.has_laughed = True
 		obstacles = []
 		particles = []
 		self.frame = self.frame + 1
@@ -43,6 +49,7 @@ class Boss():
 			if len(self.attack_stack) == 0:
 				self.attack_stack.append(random.choices(self.attacks, weights=self.atk_probs)[0])
 				self.body_parts[self.attack_stack[0][0]].state = 1
+				self.body_parts[self.attack_stack[0][0]].frame = 0
 				self.body_parts[self.attack_stack[0][0]].current_attack = self.attack_stack[0][1]
 				self.attack2_timer = pygame.time.get_ticks()
 			
@@ -52,6 +59,7 @@ class Boss():
 					if attack[0] != self.attack_stack[0][0]:
 						self.attack_stack.append(attack)
 						self.body_parts[attack[0]].state = 1
+						self.body_parts[self.attack_stack[0][0]].frame = 0
 						self.body_parts[attack[0]].current_attack = attack[1]
 				self.attack2_timer = pygame.time.get_ticks()
 
@@ -108,7 +116,62 @@ class Boss():
 			if tempy < max_off_y and tempy > -1 * max_off_y:
 				self.body_part_offset[key][1] = tempy
 
+
+	def reset(self, init_time):
+		self.head = bossHead()
+		self.pupil = bossPupil()
+		self.top = bossTop()
+		self.mid = bossMid()
+		self.bot = bossBot()
+		self.body_parts = {'top':self.top, 'mid':self.mid, 'bot':self.bot, 'head':self.head}
+		self.body_part_offset = {'top':[0,0], 'mid':[0,0], 'bot':[0,0], 'head':[0,0]}
+		self.og_widthts = {'top':[self.top.width, self.top.height], 'mid':[self.mid.width, self.mid.height], 'bot':[self.bot.width, self.bot.height]}
+		self.og_pos = {'top':self.top.pos, 'mid':self.mid.pos, 'bot':self.bot.pos}
+		
+		self.current_attack = []
+		self.attacks = [('top',1), ('mid',1), ('mid',2), ('bot', 1), ('bot', 2), ('bot', 3), ('head', 1), ('head', 2)]
+		self.atk_probs = [1, 1, 1, 1, 1, 1, 1, 1]
+		self.attack_stack = []
+		self.attack2_timer = 0
+		self.groundedMoves = [('bot', 2), ('bot', 3), ('top',1)]
+		self.num_attacks = 1
+		self.state = 0 #0-IDLE, 1-ATTACKING_1, 2-ATTACKING_2
+		self.frame = 0
+		self.init_time = init_time
+		self.has_laughed = False
+
 class bossPiece():
+
+	rock_impact_sound_1 = pygame.mixer.Sound('assets/sounds/rock_impact_1.wav')
+	rock_impact_sound_1.set_volume(0.1)
+	rock_impact_sound_2 = pygame.mixer.Sound('assets/sounds/rock_impact_2.wav')
+	rock_impact_sound_2.set_volume(0.1)
+	rock_impact_sound_3 = pygame.mixer.Sound('assets/sounds/rock_impact_3.wav')
+	rock_impact_sound_3.set_volume(0.1)
+	
+	def getRockImpact(num):
+		if num == 1:
+			bossPiece.rock_impact_sound_1.play()
+		elif num == 2:
+			bossPiece.rock_impact_sound_2.play()
+		elif num == 3:
+			bossPiece.rock_impact_sound_3.play()
+
+	rock_fall_sound_1 = pygame.mixer.Sound('assets/sounds/rock_fall_1.wav')
+	rock_fall_sound_1.set_volume(0.1)
+	rock_fall_sound_2 = pygame.mixer.Sound('assets/sounds/rock_fall_2.wav')
+	rock_fall_sound_2.set_volume(0.1)
+	rock_fall_sound_3 = pygame.mixer.Sound('assets/sounds/rock_fall_3.wav')
+	rock_fall_sound_3.set_volume(0.1)
+
+	def getRockFall(num):
+		if num == 1:
+			bossPiece.rock_fall_sound_1.play()
+		elif num == 2:
+			bossPiece.rock_fall_sound_2.play()
+		elif num == 3:
+			bossPiece.rock_fall_sound_3.play()
+
 	def __init__(self):
 		self.getPart()
 		self.frame = 0
@@ -263,6 +326,7 @@ class bossTop(bossPiece):
 		if self.current_attack == 1:
 			self.attack1rect.x = self.attack1rect.x + self.attack1rect_speed
 			if self.attack1rect.x + self.attack1rect.width > 180:
+				bossPiece.getRockImpact(random.randint(1,3))
 				self.state = 4
 				self.surf.fill((0,0,0,0))
 				self.frame = 0
@@ -336,6 +400,7 @@ class bossMid(bossPiece):
 
 			self.state = 3
 			self.current_attack = 1
+			bossPiece.getRockFall(random.randint(1,3))
 
 		if attack == 2:
 
@@ -394,6 +459,7 @@ class bossMid(bossPiece):
 		if self.current_attack == 1:
 			self.attack1rect.y = self.attack1rect.y + self.attack1rect_speed
 			if self.attack1rect.y + self.attack1rect.height > 635:
+				bossPiece.getRockImpact(random.randint(1,3))
 				self.state = 4
 				self.surf.fill((0,0,0,0))
 				self.frame = 0
@@ -401,11 +467,16 @@ class bossMid(bossPiece):
 
 		if self.current_attack == 2:
 
+			if self.attack2rects[0].y <= -85:
+				bossPiece.getRockFall(random.randint(1,3))
 			self.attack2rects[0].y = self.attack2rects[0].y + self.attack2rect_speed
 			if self.attack2rects[0].y > 320 and len(self.attack2rects) > 1:
+				if self.attack2rects[1].y <= -85:
+					bossPiece.getRockFall(random.randint(1,3))
 				self.attack2rects[1].y = self.attack2rects[1].y + self.attack2rect_speed
 			if self.attack2rects[0].y + self.attack2rects[0].height > 640:
 				fallen = self.attack2rects.pop(0)
+				bossPiece.getRockImpact(random.randint(1,3))
 				party = [Particle('circle', fallen.x + random.randint(0,fallen.width),  fallen.y + fallen.height, 8 + random.randint(-2,2), 8 + random.randint(-3,3), random.randint(-3, 3), random.randint(-10,-5), 0, 0.3, (28,20,29), 0.02) for x in range(15)]
 
 			if len(self.attack2rects) == 0:
@@ -479,6 +550,8 @@ class bossBot(bossPiece):
 			
 			self.current_attack = 1
 
+			bossPiece.getRockFall(random.randint(1,3))
+
 		elif attack == 2:
 			w, h = self.width * 1.25, self.height/2 * 1.25
 			self.attack23rect_l = pygame.Rect(0 - w, 630 - h, w, h)
@@ -544,6 +617,7 @@ class bossBot(bossPiece):
 		if self.current_attack == 1:
 			self.attack1rect.y = self.attack1rect.y + self.attack1rect_speed
 			if self.attack1rect.y + self.attack1rect.height > 635:
+				bossPiece.getRockImpact(random.randint(1,3))
 				self.state = 4
 				self.frame = 0
 				self.surf.fill((0,0,0,0))
@@ -583,6 +657,11 @@ class bossBot(bossPiece):
 
 class bossHead(bossPiece):
 	
+	laser_charge = pygame.mixer.Sound('assets/sounds/laser_charge_2.wav')
+	laser_charge.set_volume(0.01)
+	laser_shoot = pygame.mixer.Sound('assets/sounds/laser_shoot.wav')
+	laser_shoot.set_volume(0.01)
+
 	def __init__(self):
 		self.width, self.height = 188, 180
 		self.head_idle_sheet = pygame.image.load('assets/boss/boss_head_idle_sheet.png').convert_alpha()
@@ -670,9 +749,11 @@ class bossHead(bossPiece):
 				self.state = 2
 				self.horn_laser_render_trigger = False
 
+		bossHead.laser_charge.play()
 		surface.blit(self.surf, self.rect)
 
 	def attack_update(self, delta, keys):
+		bossHead.laser_shoot.play()
 		if self.current_attack == 1 or self.current_attack == 2: 
 			val = (random.random()) * self.horn_laser_rect_draw.width
 			return [Particle('circle', self.horn_laser_pos[0] + val, self.horn_laser_pos[1] + self.horn_laser_rect_draw.height - 20, 4 + random.randint(-2,2), 4 + random.randint(-2,2), (val-self.horn_laser_rect_draw.width/2)/30, random.randint(-2,-1), 0, 0.5, (255,255,255), 0.10) for x in range(20)]

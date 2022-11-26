@@ -6,6 +6,9 @@ import numpy as np
 pygame.init()
 class State():
 
+	cursor_sound = pygame.mixer.Sound('assets/sounds/cursor.wav')
+	cursor_sound.set_volume(0.1)
+
 	def __init__(self, game):
 		#pygame.mixer.init()
 		self.game = game
@@ -25,6 +28,7 @@ class State():
 class fightState(State):
 
 	def __init__(self, game):
+		print("FIGHTSTATEINIT ----------------")
 		self.game = game
 		self.frame = 0
 		self.initial_time = pygame.time.get_ticks()
@@ -76,15 +80,20 @@ class fightState(State):
 			if p1.rect.width == 0 or p1.rect.height == 2:
 				self.particles.remove(p1)
 
-		self.game.player.update(delta, keys, self.obstacles)
+		new_parts = self.game.player.update(delta, keys, self.obstacles)
+		if new_parts != None:
+			for part in new_parts:
+				self.particles.append(part)
 		self.updateSpotlight(self.game.player.pos)
 		if self.game.player.dead:
+			self.exit_state()
 			new_state = endState(self.game, False, int((pygame.time.get_ticks()-self.initial_time)/20000 * 100))
 			new_state.enter_state()
 
 		if pygame.time.get_ticks() - self.initial_time > 21000:
 			for part in self.game.boss.body_parts:
 				self.game.boss.body_parts[part].reset()
+			self.exit_state()
 			new_state = endState(self.game, True, int((pygame.time.get_ticks()-self.initial_time)/20000 * 100))
 			new_state.enter_state()
 
@@ -111,6 +120,7 @@ class fightState(State):
 		self.game.boss.render(surface, self.game.player.pos)
 		surface.fill((251,185,84), special_flags = 4)
 		rumby = self.getRumble(self.game.boss.groundedMoves)
+	
 		surface.blit(self.p_img, rumby)
 		
 		self.game.player.render(surface)
@@ -152,7 +162,6 @@ class fightState(State):
 			for attack in self.game.boss.attack_stack:
 				if attack in r_moves and self.game.boss.body_parts[attack[0]].state == 3:
 					rumble = True
-
 		if rumble and not self.rumble_prev:
 			self.rumble_prev = True
 			return (random.randint(-1,1) - 2, random.randint(-2,2) - 2)
@@ -160,18 +169,29 @@ class fightState(State):
 			self.rumble_prev = False
 			return (-2,-2)
 
+	def exit_state(self):
+		self.game.state_stack.pop()
+		pygame.mixer.music.stop()
+		pygame.mixer.music.unload()
+		pygame.mixer.music.load(self.game.tracks['menu'])
+		pygame.mixer.music.play(-1)
+
 class homeState(State):
 	def __init__(self, game):
+		self.font = pygame.font.Font('assets/Pixeboy-z8XGD.ttf', 18)
 		self.game = game
 		self.surf = pygame.Surface((self.game.WIDTH, self.game.HEIGHT))
+		self.initial_time = pygame.time.get_ticks()
 		self.credits_button_sheet = pygame.image.load('assets/ui/credits_text_sheet.png').convert_alpha()
 		self.options_button_sheet = pygame.image.load('assets/ui/options_text_sheet.png').convert_alpha()
 		self.tutorial_button_sheet = pygame.image.load('assets/ui/tutorial_text_sheet.png').convert_alpha()
 		self.pray_button_sheet = pygame.image.load('assets/ui/pray_text_sheet.png').convert_alpha()
 		self.background = pygame.image.load('assets/ui/home_menu_sheet.png').convert_alpha()
-		self.torch_glow = pygame.image.load('assets/ui/home_menu_torch_glow.png')
-		self.torch_glow_pos = [(360-self.torch_glow.get_width())/2, 400]
-		self.buttons = [[0,self.pray_button_sheet, ((360-self.pray_button_sheet.get_width()/3)/2, 74)], [0, self.credits_button_sheet, ((360-self.credits_button_sheet.get_width()/3)/2,257)], [0,self.options_button_sheet, ((360-self.options_button_sheet.get_width()/3)/2, 352)], [0,self.tutorial_button_sheet,((360-self.tutorial_button_sheet.get_width()/3)/2, 444)]]
+		self.torch_glow = pygame.image.load('assets/ui/home_menu_torch_glow.png').convert_alpha()
+		self.torch_sheet = pygame.image.load('assets/ui/home_menu_torch_sheet.png').convert_alpha()
+		self.torch_glow_pos = [(360-self.torch_glow.get_width())/3, 400]
+		self.torch_pos = [0, 0]
+		self.buttons = [[0,self.pray_button_sheet, ((360-self.pray_button_sheet.get_width()/3)/2, 74)], [0, self.tutorial_button_sheet, ((360-self.tutorial_button_sheet.get_width()/3)/2,257)], [0,self.credits_button_sheet, ((360-self.credits_button_sheet.get_width()/3)/2, 352)], [0,self.options_button_sheet,((360-self.options_button_sheet.get_width()/3)/2, 444)]]
 		self.cursor_index = 0
 		self.on_timer = True
 		self.cursor_timer = 0 
@@ -185,6 +205,9 @@ class homeState(State):
 		self.player_pos = [20, 630]
 		self.player_rect = pygame.Rect(0,0,32,32)
 
+		self.help_text = self.font.render('SPACE -> move : ENTER -> select', True, (255,255,255))
+		self.help_text_pos = ((360-self.help_text.get_width())/2, 530)
+
 	def update(self, events, delta, keys):
 		self.frame = self.frame + 1
 		if keys[pygame.K_SPACE]:
@@ -193,53 +216,79 @@ class homeState(State):
 				self.on_timer = True
 			
 			elif pygame.time.get_ticks() - self.cursor_timer > self.cursor_downtime:
-				self.cursor_index = (self.cursor_index + 1) % 4
+				self.cursor_index = (self.cursor_index + 1) % 4 
+				State.cursor_sound.play()
 				self.on_timer = False
 
 		if keys[pygame.K_RETURN]:
-			if self.cursor_index == 0:
+			if self.cursor_index == 0 and pygame.time.get_ticks() - self.initial_time > 1000:
 				self.pressed_play = True
-
-		
-		
+			elif self.cursor_index == 1 and not self.pressed_play:
+				new_state = tutorialState(self.game)
+				new_state.enter_state()
+			elif self.cursor_index == 2 and not self.pressed_play:
+				new_state = creditState(self.game)
+				new_state.enter_state()
+	
 		if self.pressed_play:
 			self.player_pos[0] = self.player_pos[0] + 2.5
 			for button in self.buttons:
 				button[0] = button[0] + 1
 			if self.player_pos[0] > 370:
+				pygame.mixer.music.stop()
+				pygame.mixer.music.unload()
+				pygame.mixer.music.load(self.game.tracks['fight'])
+				pygame.mixer.music.play(-1)
 				new_state = fightState(self.game)
 				new_state.enter_state()
 
 		else:
 			self.buttons[self.cursor_index][0] = self.buttons[self.cursor_index][0] + 1
-
 		self.updatePlayerRect()
 
 	def render(self, surface):
 		self.getBackround()
+		self.getFrame(self.torch_pos, self.torch_sheet, 10, self.frame)
 		for button in self.buttons:
 			self.getFrame(button[2], button[1], self.animation_speed, button[0])
 
 		if self.pressed_play:
 			self.getFrame((self.player_rect.x, self.player_rect.y), self.player_walk, 10, self.frame)
 			surface.blit(self.surf, (0,0))
-			surface.blit(self.torch_glow, self.torch_glow_pos)
+			surface.blit(self.torch_glow, (0,0), special_flags=1)
 		else:
 			surface.blit(self.surf, (0,0))
 			surface.blit(self.player_idle, self.player_rect)
-			surface.blit(self.torch_glow, self.torch_glow_pos)
-			
+			surface.blit(self.torch_glow, (0,0), special_flags=1)
+			if self.frame % 100 > 50:
+				surface.blit(self.help_text, self.help_text_pos)
 
+	def reset(self):
+		self.cursor_index = 0
+		self.on_timer = True
+		self.cursor_timer = 0 
+		self.cursor_downtime = 100
+		self.animation_speed = 10
+		self.frame = 0
+		self.pressed_play = False
+		self.player_pos = [20, 630]
+		self.player_rect = pygame.Rect(0,0,32,32)
+		self.pressed_play = False
+		self.initial_time = pygame.time.get_ticks()
 
 	def getBackround(self):
 		self.surf.fill((0,0,0,0))
-		index = (self.frame//10) % 4
+		if not self.pressed_play:
+			index = self.cursor_index
+		else:
+			index = 0
 		self.surf.blit(self.background, (0,0), (index * self.background.get_width()//4, 0, (index+1) * self.background.get_width()//4, self.background.get_height()))
 
 	def getFrame(self, loc, sheet, speed, frame):
 		if loc[1] == 598:
 			num_frames = 12
-
+		elif loc[1] == self.torch_pos[1]:
+			num_frames=4
 		else:
 			num_frames = 3
 		index = (frame // speed) % num_frames
@@ -249,16 +298,113 @@ class homeState(State):
 		self.player_rect.x, self.player_rect.y = self.player_pos[0]-32/2, self.player_pos[1]-32
 
 
+class creditState(State):
+	def __init__(self, game):
+		self.initial_time = pygame.time.get_ticks()
+		self.game = game
+		self.prev_image = pygame.Surface((self.game.WIDTH, self.game.HEIGHT), pygame.SRCALPHA)
+		self.game.state_stack[-1].render(self.prev_image)
+
+		self.frame = 0
+		self.credits = pygame.image.load('assets/ui/credits_menu_sheet.png').convert_alpha()
+		self.closing = False
+
+	def update(self, events, delta, keys):
+		if keys[pygame.K_RETURN] or keys[pygame.K_ESCAPE]:
+			if not self.closing and pygame.time.get_ticks()-self.initial_time > 500:
+				self.closing = True
+				self.frame = 29
+
+	def render(self, surface):
+		surface.blit(self.prev_image, (0,0))
+
+		if not self.closing:
+			self.frame = self.frame + 1
+			if self.frame > 29:
+				self.frame = 29
+		else: 
+			self.frame = self.frame-1
+			if self.frame == -1:
+				self.frame = 0
+				self.exit_state()
+		index = (self.frame // 5) % 6
+		surface.blit(self.credits, (0,0), (index * self.credits.get_width()//6, 0, self.credits.get_width()//6, self.credits.get_height()))
+
+class titleState(State):
+	def __init__(self, game):
+		self.game = game
+		self.background = pygame.image.load('assets/boss/title.png').convert_alpha()
+		self.rect = pygame.Rect(0,0,0,0)
+
+	def update(self, events, delta, keys):
+		if keys[pygame.K_RETURN] or  keys[pygame.K_SPACE]  or keys[pygame.K_ESCAPE]:
+			new_state = homeState(self.game)
+			new_state.enter_state()
+
+	def render(self, surface):
+		surface.blit(self.background, self.rect)
+
+class tutorialState(State):
+	def __init__(self, game):
+		self.initial_time = pygame.time.get_ticks()
+		self.game = game
+		self.prev_image = pygame.Surface((self.game.WIDTH, self.game.HEIGHT), pygame.SRCALPHA)
+		self.game.state_stack[-1].render(self.prev_image)
+
+		self.frame = 0
+		self.tutorial = pygame.image.load('assets/ui/tutorial_menu_sheet.png').convert_alpha()
+		self.closing = False
+
+	def update(self, events, delta, keys):
+		if keys[pygame.K_RETURN] or keys[pygame.K_ESCAPE]:
+			if not self.closing and pygame.time.get_ticks()-self.initial_time > 500:
+				self.closing = True
+				self.frame = 29
+
+	def render(self, surface):
+		surface.blit(self.prev_image, (0,0))
+
+		if not self.closing:
+			self.frame = self.frame + 1
+			if self.frame > 29:
+				self.frame = 29
+		else: 
+			self.frame = self.frame-1
+			if self.frame == -1:
+				self.frame = 0
+				self.exit_state()
+		index = (self.frame // 5) % 6
+		surface.blit(self.tutorial, (0,0), (index * self.tutorial.get_width()//6, 0, self.tutorial.get_width()//6, self.tutorial.get_height()))
+
 class endState(State):
+
+	win_sound = pygame.mixer.Sound('assets/sounds/win.wav')
+	win_sound.set_volume(0.1)
+
+	lose_sound = pygame.mixer.Sound('assets/sounds/lose.wav')
+	lose_sound.set_volume(0.1)
 	def __init__(self, game, win, percent):
 		self.game = game
 		self.win = win
 		self.percent = percent
+		if self.percent > 100:
+			self.percent = 100
 		self.counter = 0
+		if win:
+			endState.win_sound.play()
+		else:
+			endState.lose_sound.play()
+
+		self.button_width, self.button_height = 64, 64
+		self.exit_button = pygame.image.load('assets/ui/quit_button_sheet.png')
+		self.exit_button = pygame.transform.scale(self.exit_button, (self.button_width * (self.exit_button.get_width()/128), self.button_height))
+		self.retry_button = pygame.image.load('assets/ui/retry_button_sheet.png')
+		self.retry_button = pygame.transform.scale(self.retry_button, (self.button_width * (self.retry_button.get_width()/128), self.button_height))
+		self.buttons = [[0, self.retry_button, ((180-self.button_width-10), 480)], [0, self.exit_button, ((180+10),480)]]
 
 		self.background = pygame.image.load('assets/ui/end_screen.png')
 		self.initial_time = pygame.time.get_ticks()
-		self.big_font = pygame.font.SysFont('gothic', 48)
+		self.big_font = pygame.font.Font('assets/Pixeboy-z8XGD.ttf', 48)
 		self.big_font.bold = True
 		self.med_font = pygame.font.SysFont('gothic', 32)
 		self.med_font.bold = True
@@ -268,10 +414,40 @@ class endState(State):
 		self.text = [[self.big_font.render('YOU', True, (255,255,255)), self.big_font.render('DIED TO', True, (255,255,255)), self.med_font.render('AZALGANOTH... JR.', True, (255,255,255)), self.med_font.render('AFTER SAYING', True, (255,255,255)), self.med_font.render('OF THEIR NAME', True, (255,255,255))],[self.big_font.render('YOU', True, (255,255,255)), self.big_font.render('DEFEATED', True, (255,255,255)), self.med_font.render('AZALGANOTH... JR.', True, (255,255,255)), self.med_font.render('BY SAYING', True, (255,255,255)), self.med_font.render('OF THEIR NAME', True, (255,255,255))]]
 		self.num_text = self.num_font.render('%{0}'.format(str(0)), True, (255,255,255))
 
+		self.cursor_index = 0
+		self.on_timer = True
+		self.cursor_timer = 0 
+		self.cursor_downtime = 300
+		self.frame = 0
 		self.render_true = [False,False,False,False,False]
+		self.surf = pygame.Surface((self.game.WIDTH, self.game.HEIGHT))
+		self.counter_done = False
+
 
 	def update(self, events, delta, keys):
-		self.game.boss.head.update(delta, keys)
+		self.frame = self.frame + 1
+
+		if keys[pygame.K_SPACE]:
+			if not self.on_timer:
+				self.cursor_timer = pygame.time.get_ticks()
+				self.on_timer = True
+			
+			elif pygame.time.get_ticks() - self.cursor_timer > self.cursor_downtime:
+				self.cursor_index = (self.cursor_index + 1) % 2
+				State.cursor_sound.play()
+				self.on_timer = False
+
+		if keys[pygame.K_RETURN] and (pygame.time.get_ticks()-self.initial_time) / 1000 > 4:
+			if self.cursor_index == 0:
+				self.exit_state()
+				print(self.game.state_stack)
+				self.game.state_stack[0].reset()
+				self.game.boss.reset(pygame.time.get_ticks())
+				self.game.player.reset()
+			elif self.cursor_index == 1:
+				quit()
+
+		self.buttons[self.cursor_index][0] = self.buttons[self.cursor_index][0]+1
 
 	def render(self, surface):
 		delta = (pygame.time.get_ticks()-self.initial_time) / 1000
@@ -283,17 +459,31 @@ class endState(State):
 			if self.render_true[x]:
 				surface.blit(self.text[self.win][x], ((360-self.text[self.win][x].get_width())/2,100+150*x/2))
 
+		val = 0
 		if delta > 4:
 			if delta > 4.3:
 				speed = 3
 			else:
 				speed = 1
 			val = (pygame.time.get_ticks()-self.initial_time - 4000) * 	3//40 
-			if val > 100:
+			if val >= self.percent:
+				val = self.percent
+				self.counter_done = True
+			elif val > 100:
 				val = 100
+				self.counter_done = True
 			self.num_text = self.num_font.render('%{0}'.format(val), True, (255,255,255))
 			surface.blit(self.num_text, ((360-self.num_text.get_width())/2, 375))
 			surface.blit(self.text[self.win][4], ((360-self.text[self.win][4].get_width())/2, 425))
+
+			if self.counter_done:
+				for button in self.buttons:
+					self.getFrame(button[2], button[1], 10, button[0], surface)
+
+	def getFrame(self, loc, sheet, speed, frame, surface):
+		num_frames = 7
+		index = (frame // speed) % num_frames
+		surface.blit(sheet, loc, (index * sheet.get_width()//num_frames, 0, sheet.get_width()//num_frames, sheet.get_height()))
 
 
 """
